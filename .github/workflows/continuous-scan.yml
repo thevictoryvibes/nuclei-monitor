@@ -1,13 +1,9 @@
-name: 🔍 Continuous Vulnerability Monitoring
+name: Continuous Vulnerability Monitoring
 
 on:
   schedule:
-    # Every 10 minutes
     - cron: '*/10 * * * *'
-  
   workflow_dispatch:
-    # Manual trigger option
-
   push:
     branches:
       - main
@@ -15,110 +11,68 @@ on:
       - 'websites.txt'
 
 jobs:
-  vulnerability-scan:
+  scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
-      - name: 📥 Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
       
-      - name: 🐍 Setup Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
-      - name: 📦 Install Dependencies
-        run: |
-          pip install requests python-dateutil
+      - name: Install Dependencies
+        run: pip install requests
       
-      - name: 📋 Read Websites
-        id: read-urls
-        run: |
-          if [ ! -f websites.txt ]; then
-            echo "❌ websites.txt not found!"
-            exit 1
-          fi
-          
-          # Count URLs
-          url_count=$(grep -v '^#' websites.txt | grep -v '^$' | wc -l)
-          echo "url_count=$url_count" >> $GITHUB_OUTPUT
-          echo "📊 Found $url_count URLs to scan"
-      
-      - name: 🔍 Run Vulnerability Scans
-        id: scan
+      - name: Run Scan
         env:
           SCANNER_API_URL: ${{ secrets.SCANNER_API_URL }}
         run: |
-          python << 'EOF'
+          python3 -c "
           import requests
           import json
           import os
           from datetime import datetime
           
-          # Configuration
-          API_URL = os.environ['SCANNER_API_URL'].rstrip('/')
+          API_URL = os.environ.get('SCANNER_API_URL', '').rstrip('/')
           TIMESTAMP = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-          DATE_ONLY = datetime.utcnow().strftime('%Y%m%d')
           
-          # Read URLs
           with open('websites.txt', 'r') as f:
               urls = [line.strip() for line in f if line.strip() and not line.startswith('#')]
           
-          print(f"🎯 Scanning {len(urls)} URLs...")
+          print(f'Scanning {len(urls)} URLs...')
           
-          # Scan results
           all_results = []
           total_vulns = 0
           failed_scans = 0
           
           for idx, url in enumerate(urls, 1):
-              print(f"\n[{idx}/{len(urls)}] Scanning: {url}")
-              
+              print(f'[{idx}/{len(urls)}] Scanning: {url}')
               try:
                   response = requests.post(
-                      f"{API_URL}/scan",
-                      json={"url": url, "templates": "takeovers/"},
+                      f'{API_URL}/scan',
+                      json={'url': url, 'templates': 'takeovers/'},
                       timeout=90
                   )
-                  
                   if response.status_code == 200:
                       result = response.json()
                       all_results.append(result)
-                      
                       vuln_count = result.get('count', 0)
                       total_vulns += vuln_count
-                      
-                      if vuln_count > 0:
-                          print(f"  ⚠️  Found {vuln_count} vulnerabilities!")
-                      else:
-                          print(f"  ✅ No vulnerabilities found")
+                      print(f'  Found {vuln_count} vulnerabilities')
                   else:
-                      print(f"  ❌ Scan failed: HTTP {response.status_code}")
                       failed_scans += 1
-                      all_results.append({
-                          'success': False,
-                          'url': url,
-                          'error': f'HTTP {response.status_code}',
-                          'count': 0
-                      })
-              
+                      all_results.append({'success': False, 'url': url, 'error': f'HTTP {response.status_code}', 'count': 0})
               except Exception as e:
-                  print(f"  ❌ Error: {str(e)}")
                   failed_scans += 1
-                  all_results.append({
-                      'success': False,
-                      'url': url,
-                      'error': str(e),
-                      'count': 0
-                  })
+                  all_results.append({'success': False, 'url': url, 'error': str(e), 'count': 0})
           
-          # Create results directory
           os.makedirs('results', exist_ok=True)
           
-          # Save detailed results
           scan_file = f'results/scan_{TIMESTAMP}.json'
           with open(scan_file, 'w') as f:
               json.dump({
@@ -129,9 +83,6 @@ jobs:
                   'results': all_results
               }, f, indent=2)
           
-          print(f"\n💾 Saved: {scan_file}")
-          
-          # Save latest summary
           with open('results/latest_summary.json', 'w') as f:
               json.dump({
                   'last_scan': datetime.utcnow().isoformat(),
@@ -142,111 +93,76 @@ jobs:
                   'latest_file': scan_file
               }, f, indent=2)
           
-          # Set outputs for next steps
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write(f"total_vulns={total_vulns}\n")
-              f.write(f"failed_scans={failed_scans}\n")
-              f.write(f"scan_file={scan_file}\n")
+              f.write(f'total_vulns={total_vulns}\n')
+              f.write(f'failed_scans={failed_scans}\n')
           
-          print(f"\n📊 Scan Complete!")
-          print(f"   Total URLs: {len(urls)}")
-          print(f"   Vulnerabilities: {total_vulns}")
-          print(f"   Failed Scans: {failed_scans}")
-          EOF
+          print(f'Scan complete: {total_vulns} vulnerabilities, {failed_scans} failed')
+          "
       
-      - name: 📄 Generate Daily Report
+      - name: Generate Report
         run: |
-          python << 'EOF'
+          python3 -c "
           import json
           import os
           from datetime import datetime
-          from collections import defaultdict
           
           DATE = datetime.utcnow().strftime('%Y%m%d')
-          
-          # Create reports directory
           os.makedirs('reports', exist_ok=True)
           
-          # Load latest summary
           with open('results/latest_summary.json', 'r') as f:
               summary = json.load(f)
           
-          # Load detailed results
           with open(summary['latest_file'], 'r') as f:
               details = json.load(f)
           
-          # Generate report
-          report = f"""# 📊 Vulnerability Scan Report - {DATE}
+          report = f'''# Vulnerability Scan Report - {DATE}
 
 ## Summary
-- **Scan Time:** {summary['last_scan']}
-- **Total URLs Scanned:** {summary['total_urls']}
-- **Vulnerabilities Found:** {summary['total_vulnerabilities']}
-- **Failed Scans:** {summary['failed_scans']}
-- **Overall Status:** {'🔴 VULNERABLE' if summary['total_vulnerabilities'] > 0 else '🟢 SECURE'}
+- Scan Time: {summary['last_scan']}
+- Total URLs: {summary['total_urls']}
+- Vulnerabilities: {summary['total_vulnerabilities']}
+- Failed Scans: {summary['failed_scans']}
+- Status: {'VULNERABLE' if summary['total_vulnerabilities'] > 0 else 'SECURE'}
 
----
+## Results
 
-## Detailed Results
-
-"""
+'''
           
-          # Group by status
-          vulnerable = []
-          secure = []
-          failed = []
+          vulnerable = [r for r in details['results'] if r.get('success') and r.get('count', 0) > 0]
+          secure = [r for r in details['results'] if r.get('success') and r.get('count', 0) == 0]
+          failed = [r for r in details['results'] if not r.get('success')]
           
-          for result in details['results']:
-              if not result.get('success', False):
-                  failed.append(result)
-              elif result.get('count', 0) > 0:
-                  vulnerable.append(result)
-              else:
-                  secure.append(result)
-          
-          # Vulnerable URLs
           if vulnerable:
-              report += f"### ⚠️ Vulnerable URLs ({len(vulnerable)})\n\n"
+              report += f'### Vulnerable URLs ({len(vulnerable)})\n\n'
               for r in vulnerable:
-                  report += f"#### {r['url']}\n"
-                  report += f"- **Vulnerabilities:** {r['count']}\n"
-                  for vuln in r.get('vulnerabilities', []):
-                      report += f"  - **{vuln.get('info', {}).get('name', 'Unknown')}** "
-                      report += f"(Severity: {vuln.get('info', {}).get('severity', 'unknown')})\n"
-                  report += "\n"
+                  report += f'- {r[\"url\"]} - {r[\"count\"]} vulnerabilities\n'
+              report += '\n'
           
-          # Secure URLs
           if secure:
-              report += f"### ✅ Secure URLs ({len(secure)})\n\n"
+              report += f'### Secure URLs ({len(secure)})\n\n'
               for r in secure:
-                  report += f"- {r['url']}\n"
-              report += "\n"
+                  report += f'- {r[\"url\"]}\n'
+              report += '\n'
           
-          # Failed scans
           if failed:
-              report += f"### ❌ Failed Scans ({len(failed)})\n\n"
+              report += f'### Failed Scans ({len(failed)})\n\n'
               for r in failed:
-                  report += f"- {r['url']} - Error: {r.get('error', 'Unknown')}\n"
-              report += "\n"
+                  report += f'- {r[\"url\"]} - {r.get(\"error\", \"Unknown error\")}\n'
+              report += '\n'
           
-          report += "---\n\n"
-          report += "*Generated automatically by Nuclei Monitoring System*\n"
-          
-          # Save report
-          report_file = f'reports/daily_report_{DATE}.md'
-          with open(report_file, 'w') as f:
+          with open(f'reports/daily_report_{DATE}.md', 'w') as f:
               f.write(report)
           
-          print(f"📄 Report saved: {report_file}")
-          EOF
+          print(f'Report generated: reports/daily_report_{DATE}.md')
+          "
       
-      - name: 🏷️ Update Status Badge
+      - name: Update Status
         run: |
-          python << 'EOF'
+          python3 -c "
           import json
           from datetime import datetime
           
-          # Load summary
           with open('results/latest_summary.json', 'r') as f:
               summary = json.load(f)
           
@@ -254,9 +170,9 @@ jobs:
           vulns = summary['total_vulnerabilities']
           last_scan = datetime.fromisoformat(summary['last_scan']).strftime('%Y-%m-%d %H:%M UTC')
           
-          badge_color = '🔴' if status == 'vulnerable' else '🟢'
+          badge = '🔴' if status == 'vulnerable' else '🟢'
           
-          status_md = f"""# {badge_color} Monitoring Status
+          status_md = f'''# {badge} Monitoring Status
 
 **Last Scan:** {last_scan}  
 **Status:** {status.upper()}  
@@ -265,38 +181,33 @@ jobs:
 
 ---
 
-[View Dashboard](https://thevictoryvibes.github.io/nuclei-monitor/dashboard.html) | [Latest Report](./reports/)
-"""
+[View Dashboard](https://thevictoryvibes.github.io/nuclei-monitor/dashboard.html)
+'''
           
           with open('MONITORING_STATUS.md', 'w') as f:
               f.write(status_md)
           
-          print("🏷️ Status badge updated")
-          EOF
+          print('Status updated')
+          "
       
-      - name: 🧹 Cleanup Old Results
+      - name: Cleanup Old Files
         run: |
-          # Keep only last 15 days of results
-          find results/ -name "scan_*.json" -type f -mtime +15 -delete
-          find reports/ -name "daily_report_*.md" -type f -mtime +15 -delete
-          echo "🧹 Cleaned up old files"
+          find results/ -name "scan_*.json" -type f -mtime +15 -delete || true
+          find reports/ -name "daily_report_*.md" -type f -mtime +15 -delete || true
       
-      - name: 💾 Commit Results
+      - name: Commit Results
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          
           git add results/ reports/ MONITORING_STATUS.md
-          
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "📊 Scan results - $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git commit -m "Scan results - $(date -u +'%Y-%m-%d %H:%M UTC')"
             git push
-            echo "✅ Results committed and pushed"
           fi
       
-      - name: 📧 Send Email Notification
+      - name: Send Email
         if: steps.scan.outputs.total_vulns > 0
         uses: dawidd6/action-send-mail@v3
         with:
@@ -304,30 +215,10 @@ jobs:
           server_port: 587
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: '🚨 Vulnerabilities Detected - ${{ steps.scan.outputs.total_vulns }} Found'
+          subject: Vulnerabilities Detected
           to: ${{ secrets.EMAIL_USERNAME }}
           from: Nuclei Monitor
           body: |
-            Vulnerability scan completed at ${{ github.event.repository.updated_at }}
+            Vulnerabilities found: ${{ steps.scan.outputs.total_vulns }}
             
-            Total Vulnerabilities Found: ${{ steps.scan.outputs.total_vulns }}
-            Failed Scans: ${{ steps.scan.outputs.failed_scans }}
-            
-            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            
-            Dashboard: https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/dashboard.html
-          
-      - name: 📊 Summary
-        run: |
-          echo "### 🎯 Scan Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **URLs Scanned:** ${{ steps.read-urls.outputs.url_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Vulnerabilities:** ${{ steps.scan.outputs.total_vulns }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Failed:** ${{ steps.scan.outputs.failed_scans }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ steps.scan.outputs.total_vulns }}" -gt 0 ]; then
-            echo "⚠️ **Action Required:** Vulnerabilities detected!" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ **All Clear:** No vulnerabilities found" >> $GITHUB_STEP_SUMMARY
-          fi
+            View dashboard: https://thevictoryvibes.github.io/nuclei-monitor/dashboard.html
