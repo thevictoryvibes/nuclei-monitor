@@ -17,8 +17,10 @@ jobs:
       contents: write
     
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -28,167 +30,11 @@ jobs:
       - name: Install Dependencies
         run: pip install requests
       
-      - name: Run Scan
+      - name: Run Vulnerability Scan
+        id: scan
         env:
           SCANNER_API_URL: ${{ secrets.SCANNER_API_URL }}
-        run: |
-          python3 -c "
-          import requests
-          import json
-          import os
-          from datetime import datetime
-          
-          API_URL = os.environ.get('SCANNER_API_URL', '').rstrip('/')
-          TIMESTAMP = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-          
-          with open('websites.txt', 'r') as f:
-              urls = [line.strip() for line in f if line.strip() and not line.startswith('#')]
-          
-          print(f'Scanning {len(urls)} URLs...')
-          
-          all_results = []
-          total_vulns = 0
-          failed_scans = 0
-          
-          for idx, url in enumerate(urls, 1):
-              print(f'[{idx}/{len(urls)}] Scanning: {url}')
-              try:
-                  response = requests.post(
-                      f'{API_URL}/scan',
-                      json={'url': url, 'templates': 'takeovers/'},
-                      timeout=90
-                  )
-                  if response.status_code == 200:
-                      result = response.json()
-                      all_results.append(result)
-                      vuln_count = result.get('count', 0)
-                      total_vulns += vuln_count
-                      print(f'  Found {vuln_count} vulnerabilities')
-                  else:
-                      failed_scans += 1
-                      all_results.append({'success': False, 'url': url, 'error': f'HTTP {response.status_code}', 'count': 0})
-              except Exception as e:
-                  failed_scans += 1
-                  all_results.append({'success': False, 'url': url, 'error': str(e), 'count': 0})
-          
-          os.makedirs('results', exist_ok=True)
-          
-          scan_file = f'results/scan_{TIMESTAMP}.json'
-          with open(scan_file, 'w') as f:
-              json.dump({
-                  'scan_time': datetime.utcnow().isoformat(),
-                  'total_urls': len(urls),
-                  'total_vulnerabilities': total_vulns,
-                  'failed_scans': failed_scans,
-                  'results': all_results
-              }, f, indent=2)
-          
-          with open('results/latest_summary.json', 'w') as f:
-              json.dump({
-                  'last_scan': datetime.utcnow().isoformat(),
-                  'total_urls': len(urls),
-                  'total_vulnerabilities': total_vulns,
-                  'failed_scans': failed_scans,
-                  'status': 'vulnerable' if total_vulns > 0 else 'secure',
-                  'latest_file': scan_file
-              }, f, indent=2)
-          
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write(f'total_vulns={total_vulns}\n')
-              f.write(f'failed_scans={failed_scans}\n')
-          
-          print(f'Scan complete: {total_vulns} vulnerabilities, {failed_scans} failed')
-          "
-      
-      - name: Generate Report
-        run: |
-          python3 -c "
-          import json
-          import os
-          from datetime import datetime
-          
-          DATE = datetime.utcnow().strftime('%Y%m%d')
-          os.makedirs('reports', exist_ok=True)
-          
-          with open('results/latest_summary.json', 'r') as f:
-              summary = json.load(f)
-          
-          with open(summary['latest_file'], 'r') as f:
-              details = json.load(f)
-          
-          report = f'''# Vulnerability Scan Report - {DATE}
-
-## Summary
-- Scan Time: {summary['last_scan']}
-- Total URLs: {summary['total_urls']}
-- Vulnerabilities: {summary['total_vulnerabilities']}
-- Failed Scans: {summary['failed_scans']}
-- Status: {'VULNERABLE' if summary['total_vulnerabilities'] > 0 else 'SECURE'}
-
-## Results
-
-'''
-          
-          vulnerable = [r for r in details['results'] if r.get('success') and r.get('count', 0) > 0]
-          secure = [r for r in details['results'] if r.get('success') and r.get('count', 0) == 0]
-          failed = [r for r in details['results'] if not r.get('success')]
-          
-          if vulnerable:
-              report += f'### Vulnerable URLs ({len(vulnerable)})\n\n'
-              for r in vulnerable:
-                  report += f'- {r[\"url\"]} - {r[\"count\"]} vulnerabilities\n'
-              report += '\n'
-          
-          if secure:
-              report += f'### Secure URLs ({len(secure)})\n\n'
-              for r in secure:
-                  report += f'- {r[\"url\"]}\n'
-              report += '\n'
-          
-          if failed:
-              report += f'### Failed Scans ({len(failed)})\n\n'
-              for r in failed:
-                  report += f'- {r[\"url\"]} - {r.get(\"error\", \"Unknown error\")}\n'
-              report += '\n'
-          
-          with open(f'reports/daily_report_{DATE}.md', 'w') as f:
-              f.write(report)
-          
-          print(f'Report generated: reports/daily_report_{DATE}.md')
-          "
-      
-      - name: Update Status
-        run: |
-          python3 -c "
-          import json
-          from datetime import datetime
-          
-          with open('results/latest_summary.json', 'r') as f:
-              summary = json.load(f)
-          
-          status = summary['status']
-          vulns = summary['total_vulnerabilities']
-          last_scan = datetime.fromisoformat(summary['last_scan']).strftime('%Y-%m-%d %H:%M UTC')
-          
-          badge = '🔴' if status == 'vulnerable' else '🟢'
-          
-          status_md = f'''# {badge} Monitoring Status
-
-**Last Scan:** {last_scan}  
-**Status:** {status.upper()}  
-**Vulnerabilities:** {vulns}  
-**Total URLs:** {summary['total_urls']}
-
----
-
-[View Dashboard](https://thevictoryvibes.github.io/nuclei-monitor/dashboard.html)
-'''
-          
-          with open('MONITORING_STATUS.md', 'w') as f:
-              f.write(status_md)
-          
-          print('Status updated')
-          "
+        run: python scan_script.py
       
       - name: Cleanup Old Files
         run: |
@@ -207,7 +53,7 @@ jobs:
             git push
           fi
       
-      - name: Send Email
+      - name: Send Email Notification
         if: steps.scan.outputs.total_vulns > 0
         uses: dawidd6/action-send-mail@v3
         with:
@@ -215,10 +61,20 @@ jobs:
           server_port: 587
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: Vulnerabilities Detected
+          subject: 'Vulnerabilities Detected'
           to: ${{ secrets.EMAIL_USERNAME }}
           from: Nuclei Monitor
           body: |
+            Vulnerability scan completed!
+            
             Vulnerabilities found: ${{ steps.scan.outputs.total_vulns }}
+            Failed scans: ${{ steps.scan.outputs.failed_scans }}
             
             View dashboard: https://thevictoryvibes.github.io/nuclei-monitor/dashboard.html
+      
+      - name: Summary
+        run: |
+          echo "### Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Vulnerabilities:** ${{ steps.scan.outputs.total_vulns }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Failed:** ${{ steps.scan.outputs.failed_scans }}" >> $GITHUB_STEP_SUMMARY
