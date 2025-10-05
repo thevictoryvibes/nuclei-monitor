@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuclei Monitoring System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .landing-container {
+            background: white;
+            border-radius: 20px;
+            padding: 60px 40px;
+            max-width: 800px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.3em;
+            margin-bottom: 40px;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 40px 0;
+            text-align: left;
+        }
+
+        .feature {
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .feature h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .feature p {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 15px 40px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-size: 1.2em;
+            margin: 20px 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .cta-button:hover {
+            background: #764ba2;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+        }
+
+        .secondary-button {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .secondary-button:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        footer {
+            margin-top: 40px;
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .emoji {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="landing-container">
+        <h1>🔍 Nuclei Monitoring System</h1>
+        <p class="subtitle">24/7 Continuous Vulnerability Monitoring</p>
+
+        <div class="features">
+            <div class="feature">
+                <h3><span class="emoji">⚡</span>Real-time Scanning</h3>
+                <p>Automated scans every 10 minutes</p>
+            </div>
+            <div class="feature">
+                <h3><span class="emoji">🛡️</span>Subdomain Takeover</h3>
+                <p>Detects Netlify & GitHub Pages vulnerabilities</p>
+            </div>
+            <div class="feature">
+                <h3><span class="emoji">📊</span>Live Dashboard</h3>
+                <p>Beautiful real-time monitoring interface</p>
+            </div>
+            <div class="feature">
+                <h3><span class="emoji">📧</span>Instant Alerts</h3>
+                <p>Email notifications on vulnerability detection</p>
+            </div>
+        </div>
+
+        <div>
+            <a href="dashboard.html" class="cta-button">View Dashboard</a>
+            <a href="https://github.com/amimdnoman3/nuclei-monitor" class="cta-button secondary-button" target="_blank">View on GitHub</a>
+        </div>
+
+        <footer>
+            <p>Powered by Nuclei | Hosted on GitHub Pages</p>
+        </footer>
+    </div>
+</body>
+</html>
