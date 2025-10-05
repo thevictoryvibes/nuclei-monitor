@@ -1,8 +1,6 @@
 name: Continuous Vulnerability Monitoring
 
 on:
-  schedule:
-    - cron: '*/10 * * * *'
   workflow_dispatch:
   push:
     branches:
