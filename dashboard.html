@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔍 Vulnerability Monitoring Dashboard</title>
+    <title>Vulnerability Monitoring Dashboard</title>
     <style>
         * {
             margin: 0;
@@ -132,43 +132,6 @@
             word-break: break-all;
         }
 
-        .vulnerability-list {
-            margin-top: 15px;
-            padding-left: 20px;
-        }
-
-        .vulnerability-item {
-            background: white;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 5px;
-            border-left: 3px solid #e74c3c;
-        }
-
-        .severity {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 0.8em;
-            font-weight: bold;
-            margin-left: 10px;
-        }
-
-        .severity.high {
-            background: #e74c3c;
-            color: white;
-        }
-
-        .severity.medium {
-            background: #f39c12;
-            color: white;
-        }
-
-        .severity.low {
-            background: #3498db;
-            color: white;
-        }
-
         .loading {
             text-align: center;
             padding: 50px;
@@ -193,12 +156,6 @@
             transform: scale(1.05);
         }
 
-        .timestamp {
-            color: #999;
-            font-size: 0.9em;
-            margin-top: 10px;
-        }
-
         .error-message {
             background: #ffebee;
             color: #c62828;
@@ -206,16 +163,6 @@
             border-radius: 10px;
             margin: 20px 0;
             border-left: 5px solid #e74c3c;
-        }
-
-        @media (max-width: 768px) {
-            .header h1 {
-                font-size: 1.8em;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 </head>
@@ -227,9 +174,7 @@
             <button class="refresh-btn" onclick="loadDashboard()">🔄 Refresh Now</button>
         </div>
 
-        <div id="loading" class="loading">
-            ⏳ Loading dashboard data...
-        </div>
+        <div id="loading" class="loading">⏳ Loading dashboard data...</div>
 
         <div id="stats" class="stats-grid" style="display: none;"></div>
         
@@ -240,32 +185,35 @@
     </div>
 
     <script>
-        // Configuration
-        const REPO_OWNER = 'thevictoryvibes'; // Replace with your GitHub username
-        const REPO_NAME = 'nuclei-monitor'; // Replace with your repository name
+        const REPO_OWNER = 'thevictoryvibes';
+        const REPO_NAME = 'nuclei-monitor';
         const BRANCH = 'main';
-        const AUTO_REFRESH_INTERVAL = 120000; // 2 minutes
+        const AUTO_REFRESH_INTERVAL = 120000;
 
-        // Load dashboard data
         async function loadDashboard() {
             try {
                 document.getElementById('loading').style.display = 'block';
                 document.getElementById('stats').style.display = 'none';
                 document.getElementById('results').style.display = 'none';
 
-                // Fetch latest summary
-                const summaryUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/results/latest_summary.json`;
+                const summaryUrl = 'https://raw.githubusercontent.com/' + REPO_OWNER + '/' + REPO_NAME + '/' + BRANCH + '/results/latest_summary.json';
+                
+                console.log('Fetching:', summaryUrl);
+                
                 const summaryResponse = await fetch(summaryUrl);
                 
                 if (!summaryResponse.ok) {
-                    throw new Error('Failed to fetch summary data');
+                    throw new Error('Failed to fetch summary data. Status: ' + summaryResponse.status);
                 }
 
                 const summary = await summaryResponse.json();
+                console.log('Summary loaded:', summary);
 
-                // Fetch detailed results
                 const resultsPath = summary.latest_file.replace('results/', '');
-                const resultsUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/results/${resultsPath}`;
+                const resultsUrl = 'https://raw.githubusercontent.com/' + REPO_OWNER + '/' + REPO_NAME + '/' + BRANCH + '/results/' + resultsPath;
+                
+                console.log('Fetching results:', resultsUrl);
+                
                 const resultsResponse = await fetch(resultsUrl);
                 
                 if (!resultsResponse.ok) {
@@ -273,11 +221,9 @@
                 }
 
                 const details = await resultsResponse.json();
+                console.log('Details loaded:', details);
 
-                // Display stats
                 displayStats(summary);
-
-                // Display results
                 displayResults(details);
 
                 document.getElementById('loading').style.display = 'none';
@@ -286,48 +232,12 @@
 
             } catch (error) {
                 console.error('Error loading dashboard:', error);
-                document.getElementById('loading').innerHTML = `
-                    <div class="error-message">
-                        <strong>❌ Error Loading Dashboard</strong><br>
-                        ${error.message}<br><br>
-                        Please make sure:
-                        <ul style="text-align: left; margin-top: 10px;">
-                            <li>You have replaced YOUR_USERNAME and YOUR_REPO_NAME in the dashboard.html file</li>
-                            <li>At least one scan has completed successfully</li>
-                            <li>GitHub Pages is enabled for this repository</li>
-                        </ul>
-                    </div>
-                `;
+                document.getElementById('loading').innerHTML = '<div class="error-message"><strong>❌ Error Loading Dashboard</strong><br>' + error.message + '<br><br>Please make sure:<ul style="text-align: left; margin-top: 10px;"><li>At least one scan has completed successfully</li><li>GitHub Pages is enabled for this repository</li><li>Repository owner and name are correct in the code</li></ul></div>';
             }
         }
 
         function displayStats(summary) {
-            const statsHtml = `
-                <div class="stat-card">
-                    <h3>Last Scan</h3>
-                    <div class="value">${formatTime(summary.last_scan)}</div>
-                    <div class="label">UTC Time</div>
-                </div>
-
-                <div class="stat-card">
-                    <h3>Total URLs</h3>
-                    <div class="value">${summary.total_urls}</div>
-                    <div class="label">Monitored Targets</div>
-                </div>
-
-                <div class="stat-card ${summary.total_vulnerabilities >
-                <div class="stat-card ${summary.total_vulnerabilities > 0 ? 'vulnerable' : 'secure'}">
-                    <h3>Vulnerabilities</h3>
-                    <div class="value">${summary.total_vulnerabilities}</div>
-                    <div class="label">Total Found</div>
-                </div>
-
-                <div class="stat-card">
-                    <h3>Status</h3>
-                    <div class="value">${summary.status === 'vulnerable' ? '🔴' : '🟢'}</div>
-                    <div class="label">${summary.status.toUpperCase()}</div>
-                </div>
-            `;
+            const statsHtml = '<div class="stat-card"><h3>Last Scan</h3><div class="value">' + formatTime(summary.last_scan) + '</div><div class="label">UTC Time</div></div><div class="stat-card"><h3>Total URLs</h3><div class="value">' + summary.total_urls + '</div><div class="label">Monitored Targets</div></div><div class="stat-card ' + (summary.total_vulnerabilities > 0 ? 'vulnerable' : 'secure') + '"><h3>Vulnerabilities</h3><div class="value">' + summary.total_vulnerabilities + '</div><div class="label">Total Found</div></div><div class="stat-card"><h3>Status</h3><div class="value">' + (summary.status === 'vulnerable' ? '🔴' : '🟢') + '</div><div class="label">' + summary.status.toUpperCase() + '</div></div>';
 
             document.getElementById('stats').innerHTML = statsHtml;
         }
@@ -342,35 +252,16 @@
 
             let html = '';
 
-            details.results.forEach(result => {
-                const statusClass = !result.success ? 'failed' : 
-                                   result.count > 0 ? 'vulnerable' : 'secure';
-                
-                const statusIcon = !result.success ? '❌' :
-                                  result.count > 0 ? '⚠️' : '✅';
+            details.results.forEach(function(result) {
+                const statusClass = !result.success ? 'failed' : result.count > 0 ? 'vulnerable' : 'secure';
+                const statusIcon = !result.success ? '❌' : result.count > 0 ? '⚠️' : '✅';
 
-                html += `
-                    <div class="scan-item ${statusClass}">
-                        <h3>${statusIcon} ${result.url}</h3>
-                        <div class="timestamp">Scanned: ${formatTime(result.timestamp || details.scan_time)}</div>
-                `;
+                html += '<div class="scan-item ' + statusClass + '"><h3>' + statusIcon + ' ' + result.url + '</h3>';
 
                 if (!result.success) {
-                    html += `<p style="color: #f39c12; margin-top: 10px;">❌ Scan failed: ${result.error || 'Unknown error'}</p>`;
+                    html += '<p style="color: #f39c12; margin-top: 10px;">❌ Scan failed: ' + (result.error || 'Unknown error') + '</p>';
                 } else if (result.count > 0) {
-                    html += '<div class="vulnerability-list">';
-                    result.vulnerabilities.forEach(vuln => {
-                        const info = vuln.info || {};
-                        const severity = info.severity || 'unknown';
-                        html += `
-                            <div class="vulnerability-item">
-                                <strong>${info.name || 'Unknown Vulnerability'}</strong>
-                                <span class="severity ${severity}">${severity.toUpperCase()}</span>
-                                <p style="margin-top: 5px; color: #666;">${info.description || 'No description available'}</p>
-                            </div>
-                        `;
-                    });
-                    html += '</div>';
+                    html += '<p style="color: #e74c3c; margin-top: 10px;"><strong>⚠️ ' + result.count + ' vulnerabilities detected!</strong></p>';
                 } else {
                     html += '<p style="color: #27ae60; margin-top: 10px;">✅ No vulnerabilities detected</p>';
                 }
@@ -392,15 +283,12 @@
                     minute: '2-digit',
                     timeZone: 'UTC'
                 });
-            } catch {
+            } catch (e) {
                 return 'Unknown';
             }
         }
 
-        // Auto-refresh
         setInterval(loadDashboard, AUTO_REFRESH_INTERVAL);
-
-        // Initial load
         loadDashboard();
     </script>
 </body>
