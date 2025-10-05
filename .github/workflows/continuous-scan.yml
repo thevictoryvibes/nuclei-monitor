@@ -265,7 +265,7 @@ jobs:
 
 ---
 
-[View Dashboard](https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/dashboard.html) | [Latest Report](./reports/)
+[View Dashboard](https://thevictoryvibes.github.io/nuclei-monitor/dashboard.html) | [Latest Report](./reports/)
 """
           
           with open('MONITORING_STATUS.md', 'w') as f:
